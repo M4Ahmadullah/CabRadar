@@ -3,7 +3,7 @@ import { Event } from "@/types";
 
 // Test Locations (for simulator testing):
 // Saudi Tester:  24.80895, 46.70663
-// Dubai Tester:  25.0192, 55.2011
+// Dubai Tester:  25.030504, 55.204456
 // London Tester: 51.56327, -0.28784
 
 // All active events in the system
@@ -59,14 +59,14 @@ export const activeEvents: Event[] = [
   // Dubai Region Events
   {
     id: "5",
-    name: "Lulu Hypermarket Event",
+    name: "Union Coop Hypermarket Event",
     type: "event",
     coordinates: {
-      lat: 25.0283,
-      long: 55.2095,
+      lat: 25.045678,
+      long: 55.219234,
     },
     endTime: new Date(Date.now() + 3600000).toISOString(),
-    message: "Special event ending at Lulu Hypermarket",
+    message: "Special event ending at Union Coop Hypermarket",
   },
   {
     id: "6",
