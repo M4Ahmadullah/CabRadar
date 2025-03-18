@@ -3,9 +3,13 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { RadarButton } from "./RadarButton";
 import SignalService from "@/services/signalService";
-import LocationService from "@/services/locationService";
+import {
+  startBackgroundLocationTask,
+  stopBackgroundLocationTask,
+} from "@/services/backgroundLocation";
 import NotificationService from "@/services/notificationService";
 import { useEffect } from "react";
+import LocationService from "@/services/locationService";
 
 type RadarStateProps = {
   onToggle: () => Promise<void>;
@@ -34,16 +38,63 @@ export function InactiveState({ onToggle, error }: RadarStateProps) {
 
 export function ActiveState({ onToggle, error }: RadarStateProps) {
   useEffect(() => {
-    LocationService.startLocationTracking();
+    let unsubscribe: (() => void) | undefined;
+    let isStarting = false;
+    let isActive = true;
+
+    const startTracking = async () => {
+      if (isStarting || !isActive) return;
+      isStarting = true;
+
+      try {
+        console.log("[RadarStates] Starting tracking...");
+
+        // Start location tracking
+        const result = await LocationService.startLocationTracking();
+        if (!result.success) {
+          console.error(
+            "[RadarStates] Failed to start tracking:",
+            result.error
+          );
+          return;
+        }
+
+        if (!isActive) return;
+
+        // Subscribe to location updates
+        unsubscribe = LocationService.subscribeToLocationUpdates(
+          async (location) => {
+            if (!isActive) return;
+            console.log("[RadarStates] Location update received");
+            if (!SignalService.isPolling()) {
+              await SignalService.startPolling();
+            }
+          }
+        );
+      } catch (error) {
+        console.error("[RadarStates] Error starting tracking:", error);
+      } finally {
+        isStarting = false;
+      }
+    };
+
+    startTracking();
+
     return () => {
+      isActive = false;
+      console.log("[RadarStates] Cleaning up...");
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = undefined;
+      }
+      SignalService.stopPolling();
       LocationService.stopLocationTracking();
-      NotificationService.stopAllNotifications();
     };
   }, []);
 
   const handleToggle = async () => {
     try {
-      await LocationService.stopLocationTracking();
+      await stopBackgroundLocationTask();
       await onToggle();
     } catch (error) {
       console.error("Error stopping radar:", error);

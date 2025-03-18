@@ -25,20 +25,22 @@ const { height } = Dimensions.get("window");
 const MODAL_HEIGHT = height * 0.6;
 const SWIPE_THRESHOLD = 50;
 
+type NotificationData = {
+  type: string;
+  name: string;
+  message: string;
+  distance: string;
+  coordinates: {
+    lat: number;
+    long: number;
+  };
+};
+
 type NotificationModalProps = {
   isVisible: boolean;
   onClose: () => void;
   onOpenMaps: () => void;
-  data: {
-    type: string;
-    location: string;
-    distance: string;
-    message: string;
-    coordinates: {
-      lat: number;
-      long: number;
-    };
-  };
+  data: NotificationData | null;
 };
 
 export const NotificationModal: React.FC<NotificationModalProps> = ({
@@ -129,19 +131,24 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     }
   }, [isVisible]);
 
-  if (!isVisible) return null;
+  if (!isVisible || !data) return null;
+
+  const getIcon = (type: string) => {
+    return type === "event" || type === "Event"
+      ? "calendar-alert"
+      : "train-variant";
+  };
+
+  const getTitle = (type: string) => {
+    return type === "event" || type === "Event"
+      ? "Event Alert"
+      : "Station Closure Alert";
+  };
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View
-          style={[
-            styles.backdrop,
-            {
-              opacity: fadeAnim,
-            },
-          ]}
-        >
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
           <BlurView
             intensity={colorScheme === "dark" ? 40 : 80}
             tint={colorScheme === "dark" ? "dark" : "light"}
@@ -172,12 +179,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
           <View style={styles.header}>
             <MaterialCommunityIcons
-              name={data.type === "Event" ? "calendar-alert" : "train-variant"}
+              name={getIcon(data.type)}
               size={32}
               color={colors.tint}
             />
             <Text style={[styles.title, { color: colors.text }]}>
-              {data.type}
+              {getTitle(data.type)}
             </Text>
           </View>
 
@@ -189,7 +196,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 color={colors.tint}
               />
               <Text style={[styles.locationText, { color: colors.text }]}>
-                {data.location}
+                {data.name}
               </Text>
             </View>
 

@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { Platform, Alert, Linking } from "react-native";
 import { NotificationModal } from "@/components/NotificationModal";
+import { Coordinates } from "@/types";
 
 class NotificationService {
   private static notificationIntervals: { [key: string]: NodeJS.Timeout } = {};
@@ -132,49 +133,37 @@ class NotificationService {
   }
 
   static async startRepeatingNotification(
-    signalType: string,
-    location: string,
+    type: string,
+    name: string,
     distance: string,
     message: string,
-    coordinates: { lat: number; long: number }
+    coordinates: Coordinates
   ) {
-    const identifier = `${signalType}-${location}`;
-
     try {
       const { status } = await Notifications.getPermissionsAsync();
       if (status !== "granted") {
-        console.error(
-          "[NotificationService] No permission to show notifications"
-        );
-        return;
+        const { status: newStatus } =
+          await Notifications.requestPermissionsAsync();
+        if (newStatus !== "granted") return;
       }
 
-      // Clear any existing interval for this notification
-      this.stopSpecificNotification(identifier);
-
-      const sendNotification = async () => {
-        const result = await this.sendSignalNotification(
-          signalType,
-          location,
-          distance,
-          message,
-          identifier,
-          coordinates
-        );
-
-        if (!result) {
-          console.error("[NotificationService] Failed to send notification");
-        }
-
-        this.notificationIntervals[identifier] = setTimeout(
-          sendNotification,
-          20000
-        ) as unknown as NodeJS.Timeout;
-      };
-
-      await sendNotification();
+      // Only send notification, don't show modal
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${name} - ${distance}`,
+          body: message,
+          data: {
+            type,
+            name,
+            message,
+            distance,
+            coordinates,
+          },
+        },
+        trigger: null,
+      });
     } catch (error) {
-      console.error("[NotificationService] Error:", error);
+      console.error("Notification error:", error);
     }
   }
 

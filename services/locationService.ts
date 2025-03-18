@@ -6,11 +6,15 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import * as Linking from "expo-linking";
 import { Platform } from "react-native";
+import { LocationObject } from "expo-location";
+import {
+  startBackgroundLocationTask,
+  setLocationUpdateCallback,
+} from "./backgroundLocation";
 
 const BACKGROUND_LOCATION_TASK = "BACKGROUND_LOCATION_TASK";
 
-type LocationSubscriber = (location: Location.LocationObject) => void;
-const subscribers = new Set<LocationSubscriber>();
+type LocationSubscriber = (location: LocationObject) => void;
 
 type PermissionResult = {
   granted: boolean;
@@ -19,54 +23,15 @@ type PermissionResult = {
   message?: string;
 };
 
-// Register background task with test location
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  if (!data) return null;
-
-  const { locations } = data as { locations: Location.LocationObject[] };
-  const location = locations[0];
-
-  // Use the setter to update current location
-  LocationService.currentLocation = location;
-
-  // Use the public getter to access locationResolver
-  const resolver = LocationService.locationResolver;
-  if (resolver) {
-    resolver(location);
-    LocationService.locationResolver = null;
-  }
-
-  // Notify subscribers with real location
-  subscribers.forEach((subscriber) => subscriber(location));
-
-  // Log location updates
-  const now = new Date().getTime();
-  const lastLogTime = globalThis.lastLocationLogTime || 0;
-  if (now - lastLogTime >= 60000) {
-    const timeStr = new Date().toLocaleTimeString();
-    console.log(`[${timeStr}] Location update:`, {
-      lat: location.coords.latitude.toFixed(5),
-      lng: location.coords.longitude.toFixed(5),
-    });
-    globalThis.lastLocationLogTime = now;
-  }
-
-  return null;
-});
-
 class LocationService {
   private static watchSubscription: Location.LocationSubscription | null = null;
-  private static _currentLocation: Location.LocationObject | null = null;
+  private static _currentLocation: LocationObject | null = null;
   private static locationPromise: Promise<Location.LocationObject> | null =
     null;
   private static _locationResolver:
     | ((location: Location.LocationObject) => void)
     | null = null;
+  private static subscribers = new Set<LocationSubscriber>();
 
   // Add public getter/setter for locationResolver
   static get locationResolver():
@@ -81,13 +46,21 @@ class LocationService {
     this._locationResolver = resolver;
   }
 
-  // Make currentLocation accessible via static method
-  static get currentLocation(): Location.LocationObject | null {
-    return LocationService._currentLocation;
+  // Getter/Setter for currentLocation
+  static get currentLocation(): LocationObject | null {
+    return this._currentLocation;
   }
 
-  static set currentLocation(location: Location.LocationObject | null) {
-    LocationService._currentLocation = location;
+  static set currentLocation(location: LocationObject | null) {
+    this._currentLocation = location;
+    if (location) {
+      this.notifySubscribers(location);
+    }
+  }
+
+  // Add method to get subscribers
+  static getSubscribers(): Set<LocationSubscriber> {
+    return this.subscribers;
   }
 
   static async openSettings(): Promise<void> {
@@ -169,13 +142,28 @@ class LocationService {
     }
   }
 
-  static async waitForFirstLocation(): Promise<Location.LocationObject> {
+  static async waitForFirstLocation(timeout = 5000): Promise<LocationObject> {
     if (this._currentLocation) {
       return this._currentLocation;
     }
 
-    return new Promise((resolve) => {
-      this.locationResolver = resolve;
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error("Location timeout"));
+      }, timeout);
+
+      const locationCallback = (location: LocationObject) => {
+        cleanup();
+        resolve(location);
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        this.subscribers.delete(locationCallback);
+      };
+
+      this.subscribeToLocationUpdates(locationCallback);
     });
   }
 
@@ -184,44 +172,29 @@ class LocationService {
     error?: string;
   }> {
     try {
-      const hasPermissions = await this.checkPermissions();
-      if (!hasPermissions) {
-        const result = await this.requestPermissions();
-        if (!result.granted) {
-          return {
-            success: false,
-            error:
-              result.message ||
-              "Location permission is required to use the radar.",
-          };
-        }
-      }
+      console.log("[LocationService] Starting location tracking...");
 
-      // Reset location promise
-      this.locationPromise = new Promise((resolve) => {
-        this.locationResolver = resolve;
+      // Set the callback before starting the task
+      setLocationUpdateCallback((location) => {
+        console.log("[LocationService] Received location update");
+        this.currentLocation = location;
       });
 
       // Start background location updates
-      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 15000,
-        distanceInterval: 10,
-        foregroundService: {
-          notificationTitle: "CabRadar Active",
-          notificationBody: "Scanning for opportunities...",
-          notificationColor: "#007AFF",
-        },
-        showsBackgroundLocationIndicator: true,
-        activityType: Location.ActivityType.AutomotiveNavigation,
-        pausesUpdatesAutomatically: false,
-      });
+      const success = await startBackgroundLocationTask();
+      if (!success) {
+        return {
+          success: false,
+          error: "Failed to start location tracking",
+        };
+      }
 
       return { success: true };
     } catch (error) {
+      console.error("[LocationService] Start error:", error);
       return {
         success: false,
-        error: "Failed to start location tracking. Please try again.",
+        error: "Failed to start location tracking",
       };
     }
   }
@@ -251,14 +224,18 @@ class LocationService {
   }
 
   static subscribeToLocationUpdates(callback: LocationSubscriber): () => void {
-    subscribers.add(callback);
+    this.subscribers.add(callback);
     // Send initial location if available
     if (this._currentLocation) {
       callback(this._currentLocation);
     }
     return () => {
-      subscribers.delete(callback);
+      this.subscribers.delete(callback);
     };
+  }
+
+  private static notifySubscribers(location: LocationObject) {
+    this.subscribers.forEach((subscriber) => subscriber(location));
   }
 }
 

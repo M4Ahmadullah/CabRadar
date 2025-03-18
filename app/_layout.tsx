@@ -16,7 +16,6 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
-import { EventAlertModal } from "@/components/modals/EventAlertModal";
 import { NotificationModal } from "@/components/NotificationModal";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

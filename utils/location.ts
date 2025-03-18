@@ -23,7 +23,6 @@ import {
   stopBackgroundLocationTask,
 } from "@/services/backgroundLocation";
 import { EventEmitter } from "events";
-import { TEST_LOCATION } from "./testData";
 
 class LocationService {
   private static instance: LocationService;
@@ -36,7 +35,6 @@ class LocationService {
 
   private constructor() {
     this.eventEmitter = new EventEmitter();
-    this.currentLocation = TEST_LOCATION;
   }
 
   static getInstance(): LocationService {
@@ -46,21 +44,20 @@ class LocationService {
     return LocationService.instance;
   }
 
+  static getCurrentLocation(): LocationObject | null {
+    return LocationService.instance?.currentLocation || null;
+  }
+
   async updateCurrentLocation(location: LocationObject): Promise<void> {
-    // Always use test location, completely ignore incoming location
-    this.currentLocation = TEST_LOCATION;
-    this.eventEmitter.emit("locationUpdated", TEST_LOCATION);
+    this.currentLocation = location;
+    this.eventEmitter.emit("locationUpdated", location);
   }
 
-  getCurrentLocation(): LocationObject {
-    return TEST_LOCATION;
-  }
-
-  // Add a method to get coordinates in the format your logs use
   getLocationForLogging() {
+    if (!this.currentLocation) return null;
     return {
-      lat: TEST_LOCATION.coords.latitude.toFixed(5),
-      lng: TEST_LOCATION.coords.longitude.toFixed(5),
+      lat: this.currentLocation.coords.latitude.toFixed(5),
+      long: this.currentLocation.coords.longitude.toFixed(5),
     };
   }
 
@@ -68,13 +65,10 @@ class LocationService {
     if (LocationService.isTracking) return;
 
     try {
-      // Don't request real permissions
-      // const { status } = await Location.requestForegroundPermissionsAsync();
-      // if (status !== "granted") return;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
 
       LocationService.isTracking = true;
-
-      // Start background task with test location only
       await startBackgroundLocationTask();
     } catch (error) {
       console.error("Error:", error);
@@ -84,20 +78,16 @@ class LocationService {
   async stopLocationTracking() {
     try {
       LocationService.isTracking = false;
-
-      // No need to remove real location subscription
-      // if (this.locationSubscription) {
-      //   await this.locationSubscription.remove();
-      //   this.locationSubscription = null;
-      // }
-
+      if (this.locationSubscription) {
+        await this.locationSubscription.remove();
+        this.locationSubscription = null;
+      }
       await stopBackgroundLocationTask();
-      // Don't clear current location as it's always TEST_LOCATION
-      // this.currentLocation = null;
+      this.currentLocation = null;
     } catch (error) {
       console.error("[LocationService] Error:", error);
     }
   }
 }
 
-export default LocationService.getInstance();
+export default LocationService;
