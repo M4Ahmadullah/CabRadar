@@ -5,7 +5,7 @@ declare global {
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import * as Linking from "expo-linking";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 import { LocationObject } from "expo-location";
 import {
   startBackgroundLocationTask,
@@ -64,96 +64,112 @@ class LocationService {
   }
 
   static async openSettings(): Promise<void> {
-    if (Platform.OS === "ios") {
+    try {
       await Linking.openSettings();
-    } else {
-      await Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS");
+    } catch (error) {
+      console.error("[LocationService] Error opening settings:", error);
     }
   }
 
-  static async requestPermissions(): Promise<PermissionResult> {
+  static async requestPermissions(): Promise<boolean> {
     try {
-      // First check if location services are enabled
-      const enabled = await Location.hasServicesEnabledAsync();
-      if (!enabled) {
-        return {
-          granted: false,
-          shouldOpenSettings: true,
-          status: "none",
-          message:
-            "Location services are disabled. Please enable them in your device settings.",
-        };
+      console.log("[LocationService] Checking current permissions...");
+      const { status: foregroundStatus } =
+        await Location.getForegroundPermissionsAsync();
+      const { status: backgroundStatus } =
+        await Location.getBackgroundPermissionsAsync();
+
+      console.log("[LocationService] Current permissions:", {
+        foreground: foregroundStatus,
+        background: backgroundStatus,
+      });
+
+      // If we already have "Always Allow", return true
+      if (foregroundStatus === "granted" && backgroundStatus === "granted") {
+        return true;
       }
 
-      // Request foreground permission first
-      const { status: foreStatus } =
-        await Location.requestForegroundPermissionsAsync();
-      if (foreStatus !== "granted") {
-        return {
-          granted: false,
-          shouldOpenSettings: true,
-          status: "denied",
-          message:
-            "CabRadar needs location access to find opportunities near you.",
-        };
+      // If we don't have foreground permission, request it first
+      if (foregroundStatus !== "granted") {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          this.showSettingsAlert(
+            "Location Permission Required",
+            "Please enable location access in Settings to use this feature."
+          );
+          return false;
+        }
       }
 
-      // Then request background permission with proper iOS message
-      const { status: backStatus } =
-        await Location.requestBackgroundPermissionsAsync();
-
-      // Handle different permission states
-      if (backStatus === "granted") {
-        return {
-          granted: true,
-          shouldOpenSettings: false,
-          status: "background",
-        };
-      } else {
-        return {
-          granted: false,
-          shouldOpenSettings: true,
-          status: "foreground",
-          message:
-            "CabRadar needs 'Always' location access to notify you about opportunities, even when the app is in background.",
-        };
+      // Now request background permission with explanation
+      if (backgroundStatus !== "granted") {
+        Alert.alert(
+          "Background Location Required",
+          "This app needs 'Always' location access to notify you about nearby events even when the app is closed.",
+          [
+            {
+              text: "Enable in Settings",
+              onPress: async () => {
+                await this.openSettings();
+              },
+            },
+            {
+              text: "Not Now",
+              style: "cancel",
+            },
+          ]
+        );
+        return false;
       }
+
+      return true;
     } catch (error) {
-      console.error("Error requesting permissions:", error);
-      return {
-        granted: false,
-        shouldOpenSettings: true,
-        status: "none",
-        message: "An error occurred while requesting location permissions.",
-      };
+      console.error("[LocationService] Error requesting permissions:", error);
+      return false;
     }
   }
 
   static async checkPermissions(): Promise<boolean> {
     try {
       const foreground = await Location.getForegroundPermissionsAsync();
-      const background = await Location.getBackgroundPermissionsAsync();
+      if (foreground.status !== "granted") {
+        return false;
+      }
 
-      // Check if both foreground and background permissions are granted
-      return foreground.status === "granted" && background.status === "granted";
+      const background = await Location.getBackgroundPermissionsAsync();
+      return background.status === "granted";
     } catch (error) {
-      console.error("Error checking permissions:", error);
+      console.error("[LocationService] Error checking permissions:", error);
       return false;
     }
   }
 
-  static async waitForFirstLocation(timeout = 5000): Promise<LocationObject> {
-    if (this._currentLocation) {
-      return this._currentLocation;
+  static async waitForFirstLocation(
+    timeout = 10000
+  ): Promise<Location.LocationObject> {
+    if (this.currentLocation) {
+      return this.currentLocation;
     }
 
+    // Try to get current location first
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+      });
+      this.currentLocation = location;
+      return location;
+    } catch (error) {
+      console.error("[LocationService] Error getting initial location:", error);
+    }
+
+    // If that fails, wait for location update
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         cleanup();
         reject(new Error("Location timeout"));
       }, timeout);
 
-      const locationCallback = (location: LocationObject) => {
+      const locationCallback = (location: Location.LocationObject) => {
         cleanup();
         resolve(location);
       };
@@ -167,35 +183,72 @@ class LocationService {
     });
   }
 
-  static async startLocationTracking(): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
+  static async startLocationTracking() {
     try {
-      console.log("[LocationService] Starting location tracking...");
-
-      // Set the callback before starting the task
-      setLocationUpdateCallback((location) => {
-        console.log("[LocationService] Received location update");
-        this.currentLocation = location;
-      });
-
-      // Start background location updates
-      const success = await startBackgroundLocationTask();
-      if (!success) {
-        return {
-          success: false,
-          error: "Failed to start location tracking",
-        };
+      // 1. Check and request permissions first
+      const hasPermissions = await this.requestPermissions();
+      if (!hasPermissions) {
+        throw new Error("Location permissions not granted");
       }
 
-      return { success: true };
+      // 2. Double check background permission specifically
+      const { status: backgroundStatus } =
+        await Location.getBackgroundPermissionsAsync();
+      if (backgroundStatus !== "granted") {
+        Alert.alert(
+          "Background Location Required",
+          "This app requires 'Always' location access to notify you about nearby events even when the app is closed.",
+          [
+            {
+              text: "Open Settings",
+              onPress: async () => {
+                await this.openSettings();
+              },
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+          ]
+        );
+        throw new Error("Background location permission not granted");
+      }
+
+      // 3. Stop any existing tracking
+      if (await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK)) {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+      }
+
+      // Get initial location before starting updates
+      const initialLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+      });
+
+      // Set initial location
+      this.currentLocation = initialLocation;
+
+      // Start background updates
+      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 15000, // 15 seconds
+        distanceInterval: 100, // 100 meters
+        showsBackgroundLocationIndicator: true,
+        activityType: Location.ActivityType.AutomotiveNavigation,
+        foregroundService: {
+          notificationTitle: "Location Tracking Active",
+          notificationBody: "Monitoring for nearby events",
+          notificationColor: "#007AFF",
+        },
+      });
+
+      console.log("[LocationService] Location tracking started successfully");
+      return true;
     } catch (error) {
-      console.error("[LocationService] Start error:", error);
-      return {
-        success: false,
-        error: "Failed to start location tracking",
-      };
+      console.error(
+        "[LocationService] Error starting location tracking:",
+        error
+      );
+      throw error;
     }
   }
 
@@ -236,6 +289,19 @@ class LocationService {
 
   private static notifySubscribers(location: LocationObject) {
     this.subscribers.forEach((subscriber) => subscriber(location));
+  }
+
+  private static showSettingsAlert(title: string, message: string) {
+    Alert.alert(title, message, [
+      {
+        text: "Open Settings",
+        onPress: () => this.openSettings(),
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+    ]);
   }
 }
 

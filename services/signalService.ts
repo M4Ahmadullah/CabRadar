@@ -3,6 +3,7 @@ import DistanceService from "./distanceService";
 import NotificationService from "./notificationService";
 import LocationService from "./locationService";
 import { Event, Coordinates } from "@/types";
+import { LocationObject } from "expo-location";
 
 interface StatusLogEvent {
   name: string;
@@ -35,29 +36,35 @@ class SignalService {
   private static _isPolling = false;
 
   static async startPolling(): Promise<boolean> {
-    if (this._isPolling) return true;
-
     try {
-      const currentLocation = LocationService.currentLocation;
-      if (!currentLocation) {
+      if (this._isPolling) return true;
+
+      // Wait for initial location before starting
+      try {
+        await LocationService.waitForFirstLocation(10000);
+      } catch (error) {
+        console.error("[SignalService] Failed to get initial location:", error);
+        return false;
+      }
+
+      if (!LocationService.currentLocation) {
         console.error("[SignalService] No location available");
         return false;
       }
 
-      this._isPolling = true;
-      this.lastNotificationTimes = {};
-
-      // Immediate first check
+      // Do initial check immediately first
       await this.fetchAndLogSignals(true);
 
-      // Start polling
+      // Then start polling
+      this._isPolling = true;
       this.pollingInterval = setInterval(() => {
         this.fetchAndLogSignals(false);
       }, this.POLLING_INTERVAL);
 
+      console.log("🔄 Started polling for events every 15 seconds");
       return true;
     } catch (error) {
-      console.error("[SignalService] Error:", error);
+      console.error("[SignalService] Error starting polling:", error);
       this._isPolling = false;
       return false;
     }
@@ -82,38 +89,56 @@ class SignalService {
         `\n${isInitialCheck ? "🔍" : "📡"} Checking nearby events...`
       );
 
-      for (const event of dummyEvents) {
-        const distance = DistanceService.calculateDistance(
-          currentLocation.coords,
-          event.coordinates
-        );
+      const now = Date.now();
+      const signals = [...dummyEvents];
 
-        const isInRange = distance <= 1;
-        const minutesRemaining = this.getMinutesRemaining(event.endTime);
-        const now = Date.now();
+      // Convert LocationObject to Coordinates
+      const coordinates = this.locationObjectToCoordinates(currentLocation);
 
-        // Log event status
-        console.log(
-          `${isInRange ? "📍" : "📌"} ${event.name}: ${distance.toFixed(1)}km`
-        );
+      for (const event of signals) {
+        try {
+          if (
+            !event.coordinates ||
+            !event.coordinates.lat ||
+            !event.coordinates.long
+          ) {
+            console.warn(`Invalid coordinates for event: ${event.id}`);
+            continue;
+          }
 
-        // Only notify if we're actually polling or on initial check
-        if (
-          (this._isPolling || isInitialCheck) &&
-          isInRange &&
-          (isInitialCheck ||
-            now - (this.lastNotificationTimes[event.id] || 0) >=
-              this.POLLING_INTERVAL ||
-            (minutesRemaining <= 15 && minutesRemaining > 0))
-        ) {
-          await NotificationService.startRepeatingNotification(
-            event.type,
-            event.name,
-            `${distance.toFixed(1)}km away`,
-            event.message,
+          const distance = DistanceService.calculateDistance(
+            coordinates,
             event.coordinates
           );
-          this.lastNotificationTimes[event.id] = now;
+
+          const isInRange = distance <= 1;
+          const minutesRemaining = this.getMinutesRemaining(event.endTime);
+
+          // Log event status
+          console.log(
+            `${isInRange ? "📍" : "📌"} ${event.name}: ${distance.toFixed(1)}km`
+          );
+
+          // Only notify if we're actually polling or on initial check
+          if (
+            (this._isPolling || isInitialCheck) &&
+            isInRange &&
+            (isInitialCheck ||
+              now - (this.lastNotificationTimes[event.id] || 0) >=
+                this.POLLING_INTERVAL ||
+              (minutesRemaining <= 15 && minutesRemaining > 0))
+          ) {
+            await NotificationService.startRepeatingNotification(
+              event.type,
+              event.name,
+              `${distance.toFixed(1)}km away`,
+              event.message,
+              event.coordinates
+            );
+            this.lastNotificationTimes[event.id] = now;
+          }
+        } catch (eventError) {
+          console.error(`Error processing event ${event.id}:`, eventError);
         }
       }
 
@@ -121,7 +146,7 @@ class SignalService {
         console.log("🔄 Started polling for events every 15 seconds");
       }
     } catch (error) {
-      console.error("[SignalService] Error:", error);
+      console.error("Signal fetch error:", error);
       if (this._isPolling) {
         this.stopPolling();
       }
@@ -144,6 +169,16 @@ class SignalService {
 
   static isPolling(): boolean {
     return this._isPolling;
+  }
+
+  // Add type conversion helper
+  private static locationObjectToCoordinates(
+    location: LocationObject
+  ): Coordinates {
+    return {
+      lat: location.coords.latitude,
+      long: location.coords.longitude,
+    };
   }
 }
 

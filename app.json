@@ -16,11 +16,16 @@
       "bundleIdentifier": "com.cabradar.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "CabRadar needs your location to find nearby opportunities.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "CabRadar needs your location to notify you about nearby opportunities, even when the app is in background.",
-        "NSLocationAlwaysUsageDescription": "CabRadar needs background location access to notify you about nearby opportunities.",
-        "NSLocationUsageDescription": "CabRadar needs location access to work properly",
-        "UIBackgroundModes": ["location", "fetch"]
+        "NSLocationWhenInUseUsageDescription": "We need your location to show you nearby events and station closures",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need background location access to notify you about nearby events and station closures even when the app is closed",
+        "NSLocationAlwaysUsageDescription": "We need background location access to notify you about nearby events and station closures even when the app is closed",
+        "NSLocationUsageDescription": "We need your location to show you nearby events and station closures",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"],
+        "UIRequiredDeviceCapabilities": ["location-services", "gps", "armv7"],
+        "LSApplicationQueriesSchemes": ["settings"],
+        "Privacy - Location Always and When In Use Usage Description": "We need your location to show you nearby events and station closures",
+        "Privacy - Location Always Usage Description": "We need background location access to notify you about nearby events and station closures even when the app is closed",
+        "Privacy - Location When In Use Usage Description": "We need your location to show you nearby events and station closures"
       },
       "config": {
         "usesNonExemptEncryption": false

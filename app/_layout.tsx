@@ -14,12 +14,31 @@ import { StyleSheet, Linking } from "react-native";
 import NotificationService from "@/services/notificationService";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
+import * as TaskManager from "expo-task-manager";
+import * as Location from "expo-location";
+import LocationService from "@/services/locationService";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { NotificationModal } from "@/components/NotificationModal";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const BACKGROUND_LOCATION_TASK = "BACKGROUND_LOCATION_TASK";
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error(error);
+    return;
+  }
+  if (data) {
+    const { locations } = data as { locations: Location.LocationObject[] };
+    const location = locations[0];
+    if (location) {
+      LocationService.currentLocation = location;
+    }
+  }
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -38,18 +57,24 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function setupNotifications() {
-      const hasPermission = await NotificationService.requestPermissions();
-      if (hasPermission) {
-        await NotificationService.configure();
+      try {
+        const hasPermission = await NotificationService.requestPermissions();
+        if (hasPermission) {
+          await NotificationService.configure();
 
-        const subscription =
-          Notifications.addNotificationResponseReceivedListener((response) => {
-            const data = response.notification.request.content.data;
-            // Show the modal directly instead of navigation
-            router.push("/(tabs)");
-          });
+          const subscription =
+            Notifications.addNotificationResponseReceivedListener(
+              (response) => {
+                const data = response.notification.request.content.data;
+                // Show the modal directly instead of navigation
+                router.push("/(tabs)");
+              }
+            );
 
-        return () => subscription.remove();
+          return () => subscription.remove();
+        }
+      } catch (error) {
+        console.error("Setup notification error:", error);
       }
     }
 

@@ -4,6 +4,15 @@ import { Platform, Alert, Linking } from "react-native";
 import { NotificationModal } from "@/components/NotificationModal";
 import { Coordinates } from "@/types";
 
+// Add proper type for notification data
+type NotificationData = {
+  coordinates: { lat: number; long: number };
+  name: string; // Changed from location to name to match our data structure
+  message: string;
+  type: string;
+  distance: string;
+};
+
 class NotificationService {
   private static notificationIntervals: { [key: string]: NodeJS.Timeout } = {};
   private static notificationCount: { [key: string]: number } = {};
@@ -68,65 +77,76 @@ class NotificationService {
   }
 
   static async configure() {
-    await this.registerForPushNotificationsAsync();
+    try {
+      await this.registerForPushNotificationsAsync();
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("opportunities", {
-        name: "Opportunities",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 200, 200, 200],
-        lightColor: "#FF0000",
-        enableVibrate: true,
-        enableLights: true,
-        sound: "default",
-        lockscreenVisibility:
-          Notifications.AndroidNotificationVisibility.PUBLIC,
-        bypassDnd: true,
-        showBadge: true,
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("opportunities", {
+          name: "Opportunities",
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 200, 200, 200],
+          lightColor: "#FF0000",
+          enableVibrate: true,
+          enableLights: true,
+          sound: "default",
+          lockscreenVisibility:
+            Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
+          showBadge: true,
+        });
+      }
+
+      // Safer notification handling
+      Notifications.setNotificationHandler({
+        handleNotification: async () => {
+          try {
+            return {
+              shouldShowAlert: true,
+              shouldPlaySound: true,
+              shouldSetBadge: true,
+              shouldVibrate: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            };
+          } catch (error) {
+            console.error("Handle notification error:", error);
+            return {
+              shouldShowAlert: false,
+              shouldPlaySound: false,
+              shouldSetBadge: false,
+            };
+          }
+        },
       });
+
+      // Safer background subscription
+      const backgroundSubscription =
+        Notifications.addNotificationResponseReceivedListener((response) => {
+          try {
+            // Add type assertion to match our data structure
+            const data = response.notification.request.content
+              .data as NotificationData;
+            if (data) {
+              this.handleNotificationPress(data);
+            }
+          } catch (error) {
+            console.error("Background notification error:", error);
+          }
+        });
+
+      return () => {
+        backgroundSubscription.remove();
+      };
+    } catch (error) {
+      console.error("Notification configuration error:", error);
     }
-
-    // Configure notification handling for both foreground and background
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldVibrate: true,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-      }),
-    });
-
-    // Handle notification interaction
-    const backgroundSubscription =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as {
-          coordinates: { lat: number; long: number };
-          location: string;
-          message: string;
-          type: string;
-          distance: string;
-        };
-
-        this.handleNotificationPress(data);
-      });
-
-    return () => {
-      backgroundSubscription.remove();
-    };
   }
 
   static setModalRef(ref: { show: (data: any) => void; hide: () => void }) {
     this.modalRef = ref;
   }
 
-  private static async handleNotificationPress(data: {
-    coordinates: { lat: number; long: number };
-    location: string;
-    message: string;
-    type: string;
-    distance: string;
-  }) {
+  // Update the handleNotificationPress method to use the same type
+  private static async handleNotificationPress(data: NotificationData) {
     if (this.modalRef) {
       this.modalRef.show(data);
     }
