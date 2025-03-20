@@ -4,10 +4,10 @@ import { Platform, Alert, Linking } from "react-native";
 import { NotificationModal } from "@/components/NotificationModal";
 import { Coordinates } from "@/types";
 
-// Add proper type for notification data
-type NotificationData = {
+// Change from type to export type
+export type NotificationData = {
   coordinates: { lat: number; long: number };
-  name: string; // Changed from location to name to match our data structure
+  name: string;
   message: string;
   type: string;
   distance: string;

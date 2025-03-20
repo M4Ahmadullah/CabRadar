@@ -241,7 +241,13 @@ class LocationService {
         },
       });
 
-      console.log("[LocationService] Location tracking started successfully");
+      console.log(
+        "[LocationService] Location tracking started successfully at:",
+        {
+          lat: initialLocation.coords.latitude.toFixed(6),
+          long: initialLocation.coords.longitude.toFixed(6),
+        }
+      );
       return true;
     } catch (error) {
       console.error(

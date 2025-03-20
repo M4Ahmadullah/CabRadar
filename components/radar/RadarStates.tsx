@@ -103,13 +103,24 @@ export function ActiveState({ onToggle, error }: RadarStateProps) {
     return () => {
       mounted = false;
       // Cleanup tracking when component unmounts
-      LocationService.stopLocationTracking();
-      SignalService.stopPolling();
+      stopAllTracking();
     };
   }, [onToggle]);
 
+  const stopAllTracking = async () => {
+    try {
+      // Stop signal polling first
+      SignalService.stopPolling();
+      // Then stop location tracking
+      await LocationService.stopLocationTracking();
+    } catch (error) {
+      console.error("[RadarStates] Error stopping tracking:", error);
+    }
+  };
+
   const handleToggle = async () => {
     try {
+      await stopAllTracking(); // Stop everything before toggling
       await onToggle();
     } catch (error) {
       console.error("Error stopping radar:", error);
