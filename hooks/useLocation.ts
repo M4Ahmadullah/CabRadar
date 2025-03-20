@@ -27,43 +27,41 @@ export function useLocation() {
           result.message ||
             "Please enable location access in your device settings.",
           [
-            { text: "Cancel", style: "cancel" },
             {
               text: "Open Settings",
               onPress: () => LocationService.openSettings(),
             },
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
           ]
         );
-        return false;
       }
 
-      setHasPermissions(result.granted);
       return result.granted;
     } catch (err) {
-      setError("Failed to request location permissions");
+      console.error("Error requesting permissions:", err);
       return false;
     }
   };
 
   const startTracking = async () => {
     try {
+      await LocationService.startLocationTracking();
+      setIsTracking(true);
       setError(null);
 
-      const result = await LocationService.startLocationTracking();
-      if (!result.success) {
-        setError(result.error ?? "Failed to start location tracking");
+      // Start polling for signals
+      const pollingStarted = await SignalService.startPolling();
+      if (!pollingStarted) {
+        setError("Failed to start event monitoring");
         return false;
       }
 
-      setIsTracking(true);
-
-      // Wait for first location before starting polling
-      await LocationService.waitForFirstLocation();
-      await SignalService.startPolling();
-
       return true;
-    } catch (err) {
-      setError("Failed to start location tracking");
+    } catch (err: any) {
+      setError(err.message || "Failed to start location tracking");
       return false;
     }
   };

@@ -33,7 +33,7 @@ export function InactiveState({ onToggle, error }: RadarStateProps) {
     }
 
     if (isPermissionError(error)) {
-      return "Please enable location access in Settings to use this feature";
+      return 'Please Set Location access to "Always" to use this feature.\nSettings > Apps > CabRadar > Location';
     }
 
     return error; // Show original error for non-permission issues

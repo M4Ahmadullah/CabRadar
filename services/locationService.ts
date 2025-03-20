@@ -6,7 +6,7 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import * as Linking from "expo-linking";
 import { Platform, Alert } from "react-native";
-import { LocationObject } from "expo-location";
+import { LocationObject, LocationPermissionResponse } from "expo-location";
 import {
   startBackgroundLocationTask,
   setLocationUpdateCallback,
@@ -19,8 +19,15 @@ type LocationSubscriber = (location: LocationObject) => void;
 type PermissionResult = {
   granted: boolean;
   shouldOpenSettings: boolean;
-  status: "none" | "foreground" | "background" | "denied";
   message?: string;
+};
+
+// Add these types at the top of the file
+type IOSBackgroundPermissionResponse = {
+  status: Location.PermissionStatus;
+  ios?: {
+    scope: "always" | "whenInUse" | "none";
+  };
 };
 
 class LocationService {
@@ -71,7 +78,7 @@ class LocationService {
     }
   }
 
-  static async requestPermissions(): Promise<boolean> {
+  static async requestPermissions(): Promise<PermissionResult> {
     try {
       console.log("[LocationService] Checking current permissions...");
       const { status: foregroundStatus } =
@@ -86,56 +93,52 @@ class LocationService {
 
       // If we already have "Always Allow", return true
       if (foregroundStatus === "granted" && backgroundStatus === "granted") {
-        return true;
+        return {
+          granted: true,
+          shouldOpenSettings: false,
+        };
       }
 
       // If we don't have foreground permission, request it first
       if (foregroundStatus !== "granted") {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          this.showSettingsAlert(
-            "Location Permission Required",
-            "Please enable location access in Settings to use this feature."
-          );
-          return false;
+          return {
+            granted: false,
+            shouldOpenSettings: true,
+            message:
+              'Please Set Location access to "Always" to use this feature.\nSettings > Apps > CabRadar > Location',
+          };
         }
       }
 
       // Now request background permission with explanation
       if (backgroundStatus !== "granted") {
-        Alert.alert(
-          "Background Location Required",
-          "This app needs 'Always' location access to notify you about nearby events even when the app is closed.",
-          [
-            {
-              text: "Enable in Settings",
-              onPress: async () => {
-                await this.openSettings();
-              },
-            },
-            {
-              text: "Not Now",
-              style: "cancel",
-            },
-          ]
-        );
-        return false;
+        return {
+          granted: false,
+          shouldOpenSettings: true,
+          message:
+            "This app needs 'Always' location access to notify you about nearby events even when the app is closed.",
+        };
       }
 
-      return true;
+      return {
+        granted: true,
+        shouldOpenSettings: false,
+      };
     } catch (error) {
       console.error("[LocationService] Error requesting permissions:", error);
-      return false;
+      return {
+        granted: false,
+        shouldOpenSettings: false,
+        message: "Failed to request permissions",
+      };
     }
   }
 
   static async checkPermissions(): Promise<boolean> {
     try {
-      const foreground = await Location.getForegroundPermissionsAsync();
-      if (foreground.status !== "granted") {
-        return false;
-      }
-
+      // Just check if we have background permission granted
       const background = await Location.getBackgroundPermissionsAsync();
       return background.status === "granted";
     } catch (error) {
@@ -185,19 +188,12 @@ class LocationService {
 
   static async startLocationTracking() {
     try {
-      // 1. Check and request permissions first
-      const hasPermissions = await this.requestPermissions();
-      if (!hasPermissions) {
-        throw new Error("Location permissions not granted");
-      }
-
-      // 2. Double check background permission specifically
-      const { status: backgroundStatus } =
-        await Location.getBackgroundPermissionsAsync();
-      if (backgroundStatus !== "granted") {
+      // 1. Simple permission check
+      const background = await Location.getBackgroundPermissionsAsync();
+      if (background.status !== "granted") {
         Alert.alert(
           "Background Location Required",
-          "This app requires 'Always' location access to notify you about nearby events even when the app is closed.",
+          'Please Set Location access to "Always" to use this feature.\nSettings > Apps > CabRadar > Location',
           [
             {
               text: "Open Settings",
@@ -211,10 +207,10 @@ class LocationService {
             },
           ]
         );
-        throw new Error("Background location permission not granted");
+        throw new Error("Location must be set to Always");
       }
 
-      // 3. Stop any existing tracking
+      // 2. Stop any existing tracking
       if (await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK)) {
         await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
       }
@@ -308,6 +304,24 @@ class LocationService {
         style: "cancel",
       },
     ]);
+  }
+
+  static async requestInitialPermissions() {
+    try {
+      // First request "When in Use" permission to make Location appear in Settings
+      const foregroundResponse =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (foregroundResponse.status === "granted") {
+        // Then request background permission to make "Always" option available
+        await Location.requestBackgroundPermissionsAsync();
+      }
+    } catch (error) {
+      console.error(
+        "[LocationService] Error requesting initial permissions:",
+        error
+      );
+    }
   }
 }
 

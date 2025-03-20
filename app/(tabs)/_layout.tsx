@@ -21,8 +21,11 @@ export default function TabLayout() {
         tabBarStyle: Platform.select({
           ios: {
             position: "absolute",
+            zIndex: 999,
           },
-          default: {},
+          default: {
+            elevation: 4,
+          },
         }),
       }}
     >
@@ -42,7 +45,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="events"
         options={{
-          title: "Events",
+          title: "In Range Events",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="calendar.circle.fill" color={color} />
           ),

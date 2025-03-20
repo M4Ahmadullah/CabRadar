@@ -277,11 +277,25 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.3)",
   },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    elevation: 5,
+  },
   modal: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: MODAL_HEIGHT,
     padding: 20,
+    zIndex: 1001,
+    elevation: 6,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -290,7 +304,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
       },
       android: {
-        elevation: 5,
+        elevation: 6,
       },
     }),
   },

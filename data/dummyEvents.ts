@@ -194,17 +194,6 @@ export const activeEvents: Event[] = [
   },
   {
     id: "17",
-    name: "Al Rajhi Bank HQ",
-    type: "event",
-    coordinates: {
-      lat: 24.788901, // ~0.7km South-East
-      long: 46.692345,
-    },
-    endTime: new Date(Date.now() + 3600000).toISOString(),
-    message: "Corporate event at Al Rajhi HQ",
-  },
-  {
-    id: "18",
     name: "Al Safarat District",
     type: "station_closure",
     coordinates: {

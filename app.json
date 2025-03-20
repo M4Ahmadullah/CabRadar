@@ -2,7 +2,7 @@
   "expo": {
     "name": "CabRadar",
     "slug": "CabRadar",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "myapp",
@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cabradar.app",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show you nearby events and station closures",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need background location access to notify you about nearby events and station closures even when the app is closed",
@@ -45,7 +45,8 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION"
-      ]
+      ],
+      "versionCode": 3
     },
     "web": {
       "bundler": "metro",

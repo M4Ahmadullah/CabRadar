@@ -91,6 +91,11 @@ export default function RootLayout() {
     });
   }, []);
 
+  useEffect(() => {
+    // Request initial permissions when app first launches
+    LocationService.requestInitialPermissions();
+  }, []);
+
   const handleOpenMaps = () => {
     if (modalData?.coordinates) {
       const { lat, long } = modalData.coordinates;
