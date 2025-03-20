@@ -1,6 +1,6 @@
 import { dummyEvents } from "@/data/dummyEvents";
 import DistanceService from "./distanceService";
-import NotificationService from "./notificationService";
+import NotificationService, { NotificationData } from "./notificationService";
 import LocationService from "./locationService";
 import { Event, Coordinates } from "@/types";
 import { LocationObject } from "expo-location";
@@ -39,6 +39,9 @@ class SignalService {
     try {
       if (this._isPolling) return true;
 
+      // Reset notification times on start
+      this.lastNotificationTimes = {};
+
       // Wait for initial location before starting
       try {
         await LocationService.waitForFirstLocation(10000);
@@ -52,10 +55,10 @@ class SignalService {
         return false;
       }
 
-      // Do initial check immediately first
+      // Do immediate first check BEFORE setting polling state
       await this.fetchAndLogSignals(true);
 
-      // Then start polling
+      // Only set polling state and interval after first check
       this._isPolling = true;
       this.pollingInterval = setInterval(() => {
         this.fetchAndLogSignals(false);
@@ -73,8 +76,6 @@ class SignalService {
   static async fetchAndLogSignals(
     isInitialCheck: boolean = false
   ): Promise<void> {
-    if (!this._isPolling && !isInitialCheck) return;
-
     try {
       const currentLocation = LocationService.currentLocation;
       if (!currentLocation) {
@@ -91,8 +92,6 @@ class SignalService {
 
       const now = Date.now();
       const signals = [...dummyEvents];
-
-      // Convert LocationObject to Coordinates
       const coordinates = this.locationObjectToCoordinates(currentLocation);
 
       for (const event of signals) {
@@ -114,26 +113,31 @@ class SignalService {
           const isInRange = distance <= 1;
           const minutesRemaining = this.getMinutesRemaining(event.endTime);
 
-          // Log event status
           console.log(
             `${isInRange ? "📍" : "📌"} ${event.name}: ${distance.toFixed(1)}km`
           );
 
-          // Only notify if we're actually polling or on initial check
           if (
-            (this._isPolling || isInitialCheck) &&
             isInRange &&
             (isInitialCheck ||
               now - (this.lastNotificationTimes[event.id] || 0) >=
                 this.POLLING_INTERVAL ||
               (minutesRemaining <= 15 && minutesRemaining > 0))
           ) {
+            const notificationData: NotificationData = {
+              type: event.type,
+              name: event.name,
+              message: event.message,
+              distance: `${distance.toFixed(1)}km away`,
+              coordinates: event.coordinates,
+            };
+
             await NotificationService.startRepeatingNotification(
               event.type,
               event.name,
               `${distance.toFixed(1)}km away`,
               event.message,
-              event.coordinates
+              notificationData
             );
             this.lastNotificationTimes[event.id] = now;
           }
@@ -167,11 +171,6 @@ class SignalService {
     return (new Date(endTime).getTime() - Date.now()) / (1000 * 60);
   }
 
-  static isPolling(): boolean {
-    return this._isPolling;
-  }
-
-  // Add type conversion helper
   private static locationObjectToCoordinates(
     location: LocationObject
   ): Coordinates {

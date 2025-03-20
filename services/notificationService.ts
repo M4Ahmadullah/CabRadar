@@ -78,21 +78,25 @@ class NotificationService {
 
   static async configure() {
     try {
-      await this.registerForPushNotificationsAsync();
+      await Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          sound: "default", // Use system default sound
+          vibrationPattern: [0, 500, 200, 500], // Keep the long vibration pattern
+        }),
+      });
 
+      // Configure notification channel for Android
       if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("opportunities", {
-          name: "Opportunities",
-          importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 200, 200, 200],
-          lightColor: "#FF0000",
-          enableVibrate: true,
-          enableLights: true,
-          sound: "default",
-          lockscreenVisibility:
-            Notifications.AndroidNotificationVisibility.PUBLIC,
-          bypassDnd: true,
-          showBadge: true,
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 500, 200, 500],
+          lightColor: "#FF231F7C",
+          sound: "default", // Use system default sound
         });
       }
 
@@ -137,7 +141,10 @@ class NotificationService {
         backgroundSubscription.remove();
       };
     } catch (error) {
-      console.error("Notification configuration error:", error);
+      console.error(
+        "[NotificationService] Error configuring notifications:",
+        error
+      );
     }
   }
 
@@ -154,36 +161,26 @@ class NotificationService {
 
   static async startRepeatingNotification(
     type: string,
-    name: string,
-    distance: string,
-    message: string,
-    coordinates: Coordinates
-  ) {
+    title: string,
+    subtitle: string,
+    body: string,
+    data: NotificationData
+  ): Promise<void> {
     try {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== "granted") {
-        const { status: newStatus } =
-          await Notifications.requestPermissionsAsync();
-        if (newStatus !== "granted") return;
-      }
-
-      // Only send notification, don't show modal
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `${name} - ${distance}`,
-          body: message,
-          data: {
-            type,
-            name,
-            message,
-            distance,
-            coordinates,
-          },
+          title,
+          subtitle,
+          body,
+          data,
+          sound: "default",
+          vibrate: [0, 500, 200, 500],
+          priority: "high",
         },
         trigger: null,
       });
     } catch (error) {
-      console.error("Notification error:", error);
+      console.error("[NotificationService] Notification error:", error);
     }
   }
 
