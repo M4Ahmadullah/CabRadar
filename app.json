@@ -38,7 +38,7 @@
         "backgroundImage": "./assets/images/app-icon.png",
         "backgroundColor": "#001B3D"
       },
-      "package": "com.yourcabradar.app",
+      "package": "com.cabradar.app",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

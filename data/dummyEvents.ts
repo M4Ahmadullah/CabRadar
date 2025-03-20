@@ -81,17 +81,17 @@ export const activeEvents: Event[] = [
   // },
 
   // Add these two new events to the activeEvents array
-  {
-    id: "7",
-    name: "Riyadh Park Event",
-    type: "event",
-    coordinates: {
-      lat: 24.789123, // About 0.5 km from your location
-      long: 46.685234,
-    },
-    endTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour
-    message: "Special event at Riyadh Park ending soon",
-  },
+  // {
+  //   id: "7",
+  //   name: "Riyadh Park Event",
+  //   type: "event",
+  //   coordinates: {
+  //     lat: 24.789123, // About 0.5 km from your location
+  //     long: 46.685234,
+  //   },
+  //   endTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+  //   message: "Special event at Riyadh Park ending soon",
+  // },
   {
     id: "8",
     name: "King Fahd Library",
