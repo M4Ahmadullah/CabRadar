@@ -203,6 +203,17 @@ export const activeEvents: Event[] = [
     endTime: new Date(Date.now() + 7200000).toISOString(),
     message: "Station closure in Al Safarat District",
   },
+  {
+    id: "18",
+    name: "Dawakhana",
+    type: "event",
+    coordinates: {
+      lat: 24.7841311,
+      long: 46.6833349,
+    },
+    endTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+    message: "Event at Dawakhana",
+  },
 ];
 
 // Helper to get time in seconds from now
