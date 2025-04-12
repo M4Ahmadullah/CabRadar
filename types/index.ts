@@ -10,6 +10,7 @@ export type Event = {
   coordinates: Coordinates;
   endTime: string;
   message: string;
+  distance?: number; // Optional distance field from backend
 };
 
 export interface Location {

@@ -1,4 +1,14 @@
-import { dummyEvents } from "@/data/dummyEvents";
+/**
+ * Signal Service
+ *
+ * TODO: This service needs to be:
+ * 1. Connected to the backend for event data
+ * 2. Implement proper event polling
+ * 3. Add event persistence
+ * 4. Implement proper error handling
+ * 5. Add event filtering
+ */
+
 import DistanceService from "./distanceService";
 import NotificationService, { NotificationData } from "./notificationService";
 import LocationService from "./locationService";
@@ -30,19 +40,19 @@ interface StatusLog {
 }
 
 class SignalService {
+  // TODO: Implement proper polling management
   private static pollingInterval: ReturnType<typeof setInterval> | null = null;
   private static POLLING_INTERVAL = 15000; // 15 seconds
   private static lastNotificationTimes: { [eventId: string]: number } = {};
   private static _isPolling = false;
 
+  // TODO: Implement proper polling start
   static async startPolling(): Promise<boolean> {
     try {
       if (this._isPolling) return true;
 
-      // Reset notification times on start
       this.lastNotificationTimes = {};
 
-      // Wait for initial location before starting
       try {
         await LocationService.waitForFirstLocation(10000);
       } catch (error) {
@@ -55,10 +65,8 @@ class SignalService {
         return false;
       }
 
-      // Do immediate first check BEFORE setting polling state
       await this.fetchAndLogSignals(true);
 
-      // Only set polling state and interval after first check
       this._isPolling = true;
       this.pollingInterval = setInterval(() => {
         this.fetchAndLogSignals(false);
@@ -73,6 +81,7 @@ class SignalService {
     }
   }
 
+  // TODO: Implement proper signal fetching
   static async fetchAndLogSignals(
     isInitialCheck: boolean = false
   ): Promise<void> {
@@ -91,10 +100,14 @@ class SignalService {
       );
 
       const now = Date.now();
-      const signals = [...dummyEvents];
       const coordinates = this.locationObjectToCoordinates(currentLocation);
 
-      for (const event of signals) {
+      // TODO: Replace with actual API call
+      const response = await fetch("/api/events");
+      const data = await response.json();
+      const events: Event[] = data.events || [];
+
+      for (const event of events) {
         try {
           if (
             !event.coordinates ||
@@ -157,6 +170,7 @@ class SignalService {
     }
   }
 
+  // TODO: Implement proper polling stop
   static stopPolling(): void {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
@@ -167,10 +181,12 @@ class SignalService {
     }
   }
 
+  // TODO: Implement proper time remaining calculation
   private static getMinutesRemaining(endTime: string): number {
     return (new Date(endTime).getTime() - Date.now()) / (1000 * 60);
   }
 
+  // TODO: Implement proper coordinate conversion
   private static locationObjectToCoordinates(
     location: LocationObject
   ): Coordinates {

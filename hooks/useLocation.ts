@@ -1,22 +1,43 @@
+/**
+ * Location Hook
+ *
+ * This hook provides location-related functionality including:
+ * - Permission management
+ * - Location tracking
+ * - Error handling
+ * - Signal polling
+ *
+ * TODO:
+ * 1. Add location accuracy settings
+ * 2. Implement location data persistence
+ * 3. Add battery optimization
+ * 4. Add error recovery
+ * 5. Implement location analytics
+ */
+
 import { useState, useEffect } from "react";
 import LocationService from "@/services/locationService";
 import { Alert } from "react-native";
 import SignalService from "@/services/signalService";
 
 export function useLocation() {
+  // State for location permissions and tracking
   const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Check permissions on mount
   useEffect(() => {
     checkPermissions();
   }, []);
 
+  // Check current permissions
   const checkPermissions = async () => {
     const permitted = await LocationService.checkPermissions();
     setHasPermissions(permitted);
   };
 
+  // Request location permissions
   const requestPermissions = async () => {
     try {
       const result = await LocationService.requestPermissions();
@@ -46,6 +67,7 @@ export function useLocation() {
     }
   };
 
+  // Start location tracking and signal polling
   const startTracking = async () => {
     try {
       await LocationService.startLocationTracking();
@@ -66,6 +88,7 @@ export function useLocation() {
     }
   };
 
+  // Stop location tracking and signal polling
   const stopTracking = async () => {
     try {
       await LocationService.stopLocationTracking();
@@ -79,6 +102,7 @@ export function useLocation() {
     }
   };
 
+  // Return location-related functions and state
   return {
     hasPermissions,
     isTracking,

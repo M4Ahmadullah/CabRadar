@@ -1,13 +1,31 @@
+/**
+ * Background Location Service
+ *
+ * This service handles background location tracking functionality including:
+ * - Background location task definition
+ * - Location update callbacks
+ * - Task management
+ *
+ * TODO:
+ * 1. Implement proper error handling
+ * 2. Add battery optimization
+ * 3. Add location accuracy settings
+ * 4. Implement location data persistence
+ * 5. Add task status monitoring
+ */
+
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { LocationObject } from "expo-location";
 
+// Background location task identifier
 const BACKGROUND_LOCATION_TASK = "BACKGROUND_LOCATION_TASK";
 
+// Type definition for location update callback
 type LocationUpdateCallback = (location: LocationObject) => void;
 let locationUpdateCallback: LocationUpdateCallback | null = null;
 
-// Add proper type for the task data
+// Task data interface
 interface LocationTaskData {
   data: {
     locations: LocationObject[];
@@ -15,10 +33,12 @@ interface LocationTaskData {
   error: any;
 }
 
+// Set location update callback
 export function setLocationUpdateCallback(callback: LocationUpdateCallback) {
   locationUpdateCallback = callback;
 }
 
+// Define background location task
 TaskManager.defineTask(
   BACKGROUND_LOCATION_TASK,
   async (event: LocationTaskData) => {
@@ -46,9 +66,10 @@ TaskManager.defineTask(
   }
 );
 
+// Start background location task
 export async function startBackgroundLocationTask(): Promise<boolean> {
   try {
-    // First stop any existing task
+    // Stop any existing task
     if (await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK)) {
       await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
     }
@@ -63,7 +84,6 @@ export async function startBackgroundLocationTask(): Promise<boolean> {
         notificationBody: "Scanning for opportunities...",
         notificationColor: "#007AFF",
       },
-      // Add these to ensure we get updates
       showsBackgroundLocationIndicator: true,
       activityType: Location.ActivityType.AutomotiveNavigation,
       pausesUpdatesAutomatically: false,
@@ -77,6 +97,7 @@ export async function startBackgroundLocationTask(): Promise<boolean> {
   }
 }
 
+// Stop background location task
 export async function stopBackgroundLocationTask() {
   try {
     locationUpdateCallback = null;

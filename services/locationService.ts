@@ -1,3 +1,14 @@
+/**
+ * Location Service
+ *
+ * TODO: This service needs to be:
+ * 1. Connected to the backend for location updates
+ * 2. Implement proper error handling for location permissions
+ * 3. Add location data persistence
+ * 4. Implement proper logging
+ * 5. Add battery optimization for background location
+ */
+
 declare global {
   var lastLocationLogTime: number | undefined;
 }

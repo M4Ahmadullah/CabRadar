@@ -1,17 +1,37 @@
+/**
+ * Radar Ring Component
+ *
+ * This component renders an animated radar ring with:
+ * - Glow effects
+ * - Rotation animation
+ * - Pulse animation
+ * - Multiple layers for depth
+ *
+ * TODO:
+ * 1. Add performance optimizations
+ * 2. Implement color themes
+ * 3. Add size customization
+ * 4. Add animation speed control
+ * 5. Implement accessibility features
+ */
+
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import { RadarAnimations } from "@/utils/animations";
 
+// Props type definition
 type RadarRingProps = {
   isActive: boolean;
 };
 
 export const RadarRing: React.FC<RadarRingProps> = ({ isActive }) => {
+  // Animation refs
   const glowAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const outerGlowAnim = useRef(new Animated.Value(0)).current;
 
+  // Handle animation state changes
   useEffect(() => {
     if (isActive) {
       // Start all animations
@@ -42,8 +62,10 @@ export const RadarRing: React.FC<RadarRingProps> = ({ isActive }) => {
     }
   }, [isActive]);
 
+  // Don't render if not active
   if (!isActive) return null;
 
+  // Interpolate rotation value
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
@@ -98,6 +120,7 @@ export const RadarRing: React.FC<RadarRingProps> = ({ isActive }) => {
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,

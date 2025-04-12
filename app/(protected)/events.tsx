@@ -2,14 +2,12 @@ import { StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import { dummyEvents } from "@/data/dummyEvents";
 import { Event } from "@/types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import LocationService from "@/services/locationService";
-import DistanceService from "@/services/distanceService";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { NotificationModal } from "@/components/NotificationModal";
 import { Linking } from "react-native";
+import { API_ENDPOINTS } from "@/config";
 
 function EventCard({
   event,
@@ -53,50 +51,31 @@ function EventCard({
 
 export default function EventsScreen() {
   const insets = useSafeAreaInsets();
-  const [nearbyEvents, setNearbyEvents] = useState<
-    Array<Event & { distance: number }>
-  >([]);
-  const [selectedEvent, setSelectedEvent] = useState<
-    (Event & { distance: number }) | null
-  >(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    const updateNearbyEvents = () => {
-      const currentLocation = LocationService.currentLocation;
-      if (!currentLocation) return;
-
-      const eventsInRange = dummyEvents
-        .map((event) => {
-          const distance = DistanceService.calculateDistance(
-            {
-              latitude: currentLocation.coords.latitude,
-              longitude: currentLocation.coords.longitude,
-            },
-            { lat: event.coordinates.lat, long: event.coordinates.long }
-          );
-          return { ...event, distance };
-        })
-        .filter((event) => event.distance <= 1) // Only events within 1km
-        .sort((a, b) => a.distance - b.distance); // Sort by distance
-
-      setNearbyEvents(eventsInRange);
-    };
-
-    // Initial update
-    updateNearbyEvents();
-
-    // Subscribe to location updates
-    const unsubscribe = LocationService.subscribeToLocationUpdates(() => {
-      updateNearbyEvents();
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    fetchEvents();
   }, []);
 
-  const handleEventPress = (event: Event & { distance: number }) => {
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(API_ENDPOINTS.EVENTS.LIST);
+      const data = await response.json();
+      setEvents(data.events);
+    } catch (err) {
+      console.error("Error fetching events:", err);
+      setError("Failed to load events");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEventPress = (event: Event) => {
     setSelectedEvent(event);
     setModalVisible(true);
   };
@@ -109,23 +88,37 @@ export default function EventsScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, { paddingTop: insets.top + 20 }]}>
+        <ThemedText>Loading events...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  if (error) {
+    return (
+      <ThemedView style={[styles.container, { paddingTop: insets.top + 20 }]}>
+        <ThemedText>{error}</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + 20 }]}>
       <ThemedText type="title" style={styles.header}>
-        In Range Events
+        Events
       </ThemedText>
-      {nearbyEvents.length === 0 ? (
-        <ThemedText style={styles.noEvents}>
-          No events within 1km of your location
-        </ThemedText>
+      {events.length === 0 ? (
+        <ThemedText style={styles.noEvents}>No events found</ThemedText>
       ) : (
         <FlatList
-          data={nearbyEvents}
+          data={events}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <EventCard
               event={item}
-              distance={item.distance}
+              distance={item.distance || 0}
               onPress={() => handleEventPress(item)}
             />
           )}
@@ -145,7 +138,9 @@ export default function EventsScreen() {
                 type: selectedEvent.type,
                 name: selectedEvent.name,
                 message: selectedEvent.message,
-                distance: `${selectedEvent.distance.toFixed(1)}km away`,
+                distance: selectedEvent.distance
+                  ? `${selectedEvent.distance.toFixed(1)}km away`
+                  : "Distance unknown",
                 coordinates: selectedEvent.coordinates,
               }
             : null

@@ -88,6 +88,33 @@ class LocationService {
       console.error("[LocationService] Error:", error);
     }
   }
+
+  async requestPermissions(): Promise<boolean> {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      return status === "granted";
+    } catch (error) {
+      console.error("Error requesting location permissions:", error);
+      return false;
+    }
+  }
+
+  async getCurrentLocation(): Promise<LocationObject | null> {
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      this.currentLocation = location;
+      return location;
+    } catch (error) {
+      console.error("Error getting current location:", error);
+      return null;
+    }
+  }
+
+  getLastKnownLocation(): LocationObject | null {
+    return this.currentLocation;
+  }
 }
 
-export default LocationService;
+export default LocationService.getInstance();

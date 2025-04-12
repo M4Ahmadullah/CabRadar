@@ -4,84 +4,100 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { StyleSheet, Linking } from "react-native";
+import { StyleSheet, Linking, View } from "react-native";
 import NotificationService from "@/services/notificationService";
 import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
-import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import LocationService from "@/services/locationService";
+import {
+  startBackgroundLocationTask,
+  stopBackgroundLocationTask,
+} from "@/services/backgroundLocation";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { NotificationModal } from "@/components/NotificationModal";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const BACKGROUND_LOCATION_TASK = "BACKGROUND_LOCATION_TASK";
+function RootLayoutNav() {
+  const { user, isLoading } = useAuth();
 
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
-  if (error) {
-    console.error(error);
-    return;
-  }
-  if (data) {
-    const { locations } = data as { locations: Location.LocationObject[] };
-    const location = locations[0];
-    if (location) {
-      LocationService.currentLocation = location;
-    }
-  }
-});
+  console.log("[RootLayoutNav] Current auth state:", {
+    hasUser: !!user,
+    isLoading,
+  });
 
-export default function RootLayout() {
+  // Show loading screen while checking auth state
+  if (isLoading) {
+    console.log("[RootLayoutNav] Showing loading screen");
+    return <LoadingScreen />;
+  }
+
+  console.log("[RootLayoutNav] Rendering navigation stack");
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(protected)" options={{ headerShown: false }} />
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+    </Stack>
+  );
+}
+
+function RootLayout() {
+  console.log("[RootLayout] Initializing root layout");
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
-  const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [modalData, setModalData] = useState<any>(null);
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      console.log("[RootLayout] Fonts loaded, hiding splash screen");
+      SplashScreen.hideAsync().catch((error) => {
+        console.error("[RootLayout] Error hiding splash screen:", error);
+      });
     }
   }, [loaded]);
 
   useEffect(() => {
-    async function setupNotifications() {
+    console.log("[RootLayout] Initializing notification services");
+    // Initialize notification services
+    const initializeServices = async () => {
       try {
-        const hasPermission = await NotificationService.requestPermissions();
-        if (hasPermission) {
-          await NotificationService.configure();
-
-          const subscription =
-            Notifications.addNotificationResponseReceivedListener(
-              (response) => {
-                const data = response.notification.request.content.data;
-                // Show the modal directly instead of navigation
-                router.push("/(tabs)");
-              }
-            );
-
-          return () => subscription.remove();
-        }
+        // Configure notifications
+        await NotificationService.configure();
+        console.log("[RootLayout] Notification services initialized");
       } catch (error) {
-        console.error("Setup notification error:", error);
+        console.error(
+          "[RootLayout] Error initializing notification services:",
+          error
+        );
       }
-    }
+    };
 
-    setupNotifications();
+    initializeServices();
+
+    return () => {
+      console.log("[RootLayout] Cleaning up notification services");
+      // Cleanup
+      NotificationService.stopAllNotifications();
+    };
   }, []);
 
   useEffect(() => {
+    console.log("[RootLayout] Setting up notification modal ref");
     NotificationService.setModalRef({
       show: (data) => {
         setModalData(data);
@@ -92,38 +108,51 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    console.log("[RootLayout] Requesting location permissions");
     // Request initial permissions when app first launches
-    LocationService.requestInitialPermissions();
+    LocationService.requestInitialPermissions().catch((error) => {
+      console.error(
+        "[RootLayout] Error requesting location permissions:",
+        error
+      );
+    });
   }, []);
 
   const handleOpenMaps = () => {
     if (modalData?.coordinates) {
       const { lat, long } = modalData.coordinates;
       const url = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
-      Linking.openURL(url);
+      Linking.openURL(url).catch((error) => {
+        console.error("[RootLayout] Error opening maps:", error);
+      });
     }
   };
 
   if (!loaded) {
-    return null;
+    console.log("[RootLayout] Fonts not loaded, showing loading screen");
+    return <LoadingScreen />;
   }
 
+  console.log("[RootLayout] Rendering main layout");
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-        <NotificationModal
-          isVisible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          onOpenMaps={handleOpenMaps}
-          data={modalData}
-        />
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <AuthProvider>
+      <NotificationProvider>
+        <GestureHandlerRootView style={styles.container}>
+          <ThemeProvider
+            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+          >
+            <RootLayoutNav />
+            <StatusBar style="auto" />
+            <NotificationModal
+              isVisible={modalVisible}
+              onClose={() => setModalVisible(false)}
+              onOpenMaps={handleOpenMaps}
+              data={modalData}
+            />
+          </ThemeProvider>
+        </GestureHandlerRootView>
+      </NotificationProvider>
+    </AuthProvider>
   );
 }
 
@@ -132,3 +161,5 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+export default RootLayout;

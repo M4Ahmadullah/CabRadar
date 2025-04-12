@@ -1,14 +1,13 @@
 import { Tabs } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
-
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
-export default function TabLayout() {
+function ProtectedLayout() {
   const colorScheme = useColorScheme();
 
   return (
@@ -30,7 +29,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="radar"
         options={{
           title: "Radar",
           tabBarIcon: ({ color }) => (
@@ -54,3 +53,5 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+export default ProtectedLayout;
